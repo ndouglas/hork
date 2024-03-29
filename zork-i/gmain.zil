@@ -4,8 +4,10 @@
 
 <CONSTANT SERIAL 0>
 
+// Set PLAYER to <> (FALSE).
 <GLOBAL PLAYER <>>
 
+// Set P-WON to <> (FALSE).
 <GLOBAL P-WON <>>
 
 // I'm not sure what the `M-` prefix means. Magic? Meta?
