@@ -7,6 +7,7 @@ import Data.Map qualified as Map
 import Data.Maybe qualified
 import Data.Word (Word32)
 
+-- The Attribute type represents the possible attributes of an object.
 data Attribute
   = -- Room is part of the maze.
     MazeBit
@@ -80,22 +81,30 @@ data Attribute
     NonLandBit
   deriving (Enum, Show)
 
+-- The Attributes type represents the attributes of an object.
 newtype Attributes = Attributes Word32 deriving (Eq, Num, Bits, Show)
 
+-- Set an attribute bit.
 setAttr :: Attribute -> Attributes -> Attributes
 setAttr attr attrs = attrs `setBit` fromEnum attr
 
+-- Clear an attribute bit.
 clearAttr :: Attribute -> Attributes -> Attributes
 clearAttr attr attrs = attrs `clearBit` fromEnum attr
 
+-- Check whether an attribute bit is set.
 checkAttr :: Attribute -> Attributes -> Bool
 checkAttr attr attrs = attrs `testBit` fromEnum attr
 
+-- The default attributes for an object.
 defaultAttributes :: Attributes
 defaultAttributes = Attributes 0
 
+-- The Properties type represents the properties of an object.
 data Properties = Properties
-  { -- z-string describing the object
+  { -- description of the object
+    desc :: String,
+    -- z-string describing the object
     text :: String,
     -- weight or size of the object
     size :: Int,
@@ -117,7 +126,11 @@ data Properties = Properties
     -- synonyms for the object, including primary name
     synonyms :: [String],
     -- exits from the room
-    exits :: Map.Map Direction Exit
+    exits :: Map.Map Direction Exit,
+    -- starting location
+    location :: ObjectId,
+    -- action associated with this object
+    action :: Maybe RoomAction
   }
   deriving (Show)
 
@@ -128,10 +141,12 @@ isObjectOpen gameState objectId =
     Just entity -> checkAttr OpenBit (attrs entity)
     Nothing -> False -- Object not found (WTF?)
 
+-- The default properties for an object.
 defaultProperties :: Properties
 defaultProperties =
   Properties
-    { text = "",
+    { desc = "",
+      text = "",
       size = 5,
       capacity = 0,
       value = 0,
@@ -141,8 +156,30 @@ defaultProperties =
       health = 0,
       adjectives = [],
       synonyms = [],
-      exits = mempty
+      exits = mempty,
+      location = ObjectId "Rooms",
+      action = Nothing
     }
+
+-- A room-argument is passed to the action routine.
+data RoomArgument
+  = -- When a room is entered.
+    Enter
+  | -- When a room is exited.
+    Exit
+  | -- When a room is looked at.
+    Look
+  | -- At the beginning of a turn.
+    Begin
+  | -- At the end of a turn.
+    End
+  deriving (Show)
+
+-- The RoomAction is a function associated with a room.
+type RoomAction = RoomArgument -> GameState -> GameState
+
+instance Show RoomAction where
+  show _ = "RoomAction"
 
 -- The ObjectId type represents the unique identifier for an object.
 newtype ObjectId = ObjectId String deriving (Eq, Ord, Show)
@@ -264,6 +301,11 @@ gameState =
       globalFlags = Map.fromList [("WON-FLAG", False)]
     }
 
+-- Set a global flag.
+setGlobalFlag :: GameState -> String -> Bool -> GameState
+setGlobalFlag gameState flagName flagValue =
+  gameState {globalFlags = Map.insert flagName flagValue (globalFlags gameState)}
+
 -- Check whether a global flag is set.
 checkGlobalFlag :: GameState -> String -> Bool
 checkGlobalFlag gameState flagName =
@@ -275,3 +317,57 @@ checkGlobalFlag gameState flagName =
 addObject :: GameState -> ObjectId -> GameObject -> GameState
 addObject gameState objectId object =
   gameState {objects = Map.insert objectId object (objects gameState)}
+
+-- Set every attribute in a provided list to true and return the resulting
+-- attributes.
+withSetAttrs :: [Attribute] -> Attributes -> Attributes
+withSetAttrs rest attrs = foldl (flip setAttr) attrs rest
+
+-- <ROOM WEST-OF-HOUSE
+--       (IN ROOMS)
+--       (DESC "West of House")
+--       (NORTH TO NORTH-OF-HOUSE)
+--       (SOUTH TO SOUTH-OF-HOUSE)
+--       (NE TO NORTH-OF-HOUSE)
+--       (SE TO SOUTH-OF-HOUSE)
+--       (WEST TO FOREST-1)
+--       (EAST "The door is boarded and you can't remove the boards.")
+--       (SW TO STONE-BARROW IF WON-FLAG)
+--       (IN TO STONE-BARROW IF WON-FLAG)
+--       (ACTION WEST-HOUSE)
+--       (FLAGS RLANDBIT ONBIT SACREDBIT)
+--       (GLOBAL WHITE-HOUSE BOARD FOREST)>
+
+-- <ROUTINE WEST-HOUSE (RARG)
+-- 	 <COND (<EQUAL? .RARG ,M-LOOK>
+-- 		<TELL
+-- "You are standing in an open field west of a white house, with a boarded
+-- front door.">
+-- 		<COND (,WON-FLAG
+-- 		       <TELL
+-- " A secret path leads southwest into the forest.">)>
+-- 		<CRLF>)>>
+
+-- The "West of House" room.
+westOfHouse :: GameObject
+westOfHouse =
+  GameObject
+    { attrs = withSetAttrs [RLandBit, OnBit, SacredBit] defaultAttributes,
+      props =
+        defaultProperties
+          { desc = "West of House",
+            exits =
+              Map.fromList
+                [ (North, Unconditional (ObjectId "North of House")),
+                  (South, Unconditional (ObjectId "South of House")),
+                  (NE, Unconditional (ObjectId "North of House")),
+                  (SE, Unconditional (ObjectId "South of House")),
+                  (West, Unconditional (ObjectId "Forest 1")),
+                  (East, NoExit "The door is boarded and you can't remove the boards."),
+                  (SW, Conditional (GlobalFlag "WON-FLAG") (ObjectId "Stone Barrow") "You can't go that way."),
+                  (In, Conditional (GlobalFlag "WON-FLAG") (ObjectId "Stone Barrow") "You can't go that way.")
+                ],
+            adjectives = ["white", "house", "board", "forest"],
+            location = ObjectId "Rooms"
+          }
+    }
