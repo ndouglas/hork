@@ -165,18 +165,18 @@ data ExitCondition
 -- Evaluate an exit condition to determine if the player can exit the room.
 evaluateExit :: GameState -> Exit -> Either String ObjectId
 -- The player can always exit the room.
-evaluateExit gameState (Unconditional roomId) = Right roomId
+evaluateExit gameState (Unconditional objectId) = Right objectId
 -- The player cannot move in this direction; a message is displayed.
 evaluateExit gameState (NoExit msg) = Left msg
 -- A condition determines whether the player can move in this direction.
-evaluateExit gameState (Conditional cond roomId msg) =
+evaluateExit gameState (Conditional cond objectId msg) =
   case cond of
     -- The player can always exit the room.
-    AlwaysTrue -> Right roomId
+    AlwaysTrue -> Right objectId
     -- The player can exit the room if the specified global flag is set.
     GlobalFlag flagName ->
       if checkGlobalFlag gameState flagName
-        then Right roomId
+        then Right objectId
         else Left msg
     -- The player can exit the room if the specified object has the specified
     -- attribute bit set.
@@ -185,7 +185,7 @@ evaluateExit gameState (Conditional cond roomId msg) =
         Nothing -> Left "Object not found"
         Just entity ->
           if checkAttr stateCheck (attrs entity)
-            then Right roomId
+            then Right objectId
             else Left msg
     -- For providing a specific message when the player cannot exit the room.
     Else condition msg -> evaluateExit gameState (NoExit msg)
@@ -233,7 +233,10 @@ rooms :: GameObject
 rooms =
   GameObject
     { attrs = defaultAttributes,
-      props = defaultProperties
+      props =
+        defaultProperties
+          { exits = Map.fromList [(In, Unconditional (ObjectId "Rooms"))]
+          }
     }
 
 type ObjectLookup = Map.Map ObjectId GameObject
@@ -257,7 +260,7 @@ gameState =
   GameState
     { zorkNumber = 1,
       here = ObjectId "West of House",
-      objects = mempty,
+      objects = Map.fromList [(ObjectId "Rooms", rooms)],
       globalFlags = Map.fromList [("WON-FLAG", False)]
     }
 
@@ -267,3 +270,8 @@ checkGlobalFlag gameState flagName =
   Data.Maybe.fromMaybe
     False
     (Map.lookup flagName (globalFlags gameState))
+
+-- Insert an object into the game state.
+addObject :: GameState -> ObjectId -> GameObject -> GameState
+addObject gameState objectId object =
+  gameState {objects = Map.insert objectId object (objects gameState)}
