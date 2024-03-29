@@ -1,9 +1,9 @@
 import Actions
 import Clock
+import CommonTypes
 import Dungeon
 import Globals
 import Macros
-import Object
 import Parser
 import Syntax
 import Verbs
