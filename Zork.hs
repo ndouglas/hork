@@ -8,8 +8,4 @@ import Parser
 import Syntax
 import Verbs
 
--- Zork I, as opposed to II or III.
-zorkNumber :: Int
-zorkNumber = 1
-
 main = putStrLn "Hello, Haskell!"
