@@ -32,10 +32,9 @@
 <PROPDEF SIZE 5>
 // Default "CAPACITY", an object's carrying capacity.
 <PROPDEF CAPACITY 0>
-// Default "VALUE", the score conferred by taking the object.
+// Default "VALUE", the score for taking the object.
 <PROPDEF VALUE 0>
-// Default "TVALUE", the score conferred by placing the object in the trophy
-// case.
+// Default "TVALUE", the score for placing the object in the trophy case.
 <PROPDEF TVALUE 0>
 
 // See gclock.zil
