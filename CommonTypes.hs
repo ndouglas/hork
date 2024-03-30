@@ -391,5 +391,8 @@ westOfHouse =
 
 -- The action associated with the "West of House" room.
 westOfHouseAction :: RoomArgument -> GameState -> IO GameState
-westOfHouseAction Look gameState = tell "You are standing in an open field west of a white house, with a boarded front door." gameState
+westOfHouseAction Look gameState =
+  if checkGlobalFlag gameState "WON-FLAG"
+    then tell "You are standing in an open field west of a white house, with a boarded front door. A secret path leads southwest into the forest." gameState
+    else tell "You are standing in an open field west of a white house, with a boarded front door." gameState
 westOfHouseAction _ gameState = return gameState
