@@ -2,6 +2,7 @@
 
 module CommonTypes where
 
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Bits
 import Data.Map qualified as Map
 import Data.Maybe qualified
@@ -130,7 +131,7 @@ data Properties = Properties
     -- starting location
     location :: ObjectId,
     -- action associated with this object
-    action :: Maybe RoomAction
+    action :: Maybe (RoomAction IO)
   }
   deriving (Show)
 
@@ -176,9 +177,9 @@ data RoomArgument
   deriving (Show)
 
 -- The RoomAction is a function associated with a room.
-type RoomAction = RoomArgument -> GameState -> GameState
+type RoomAction m = RoomArgument -> GameState -> m GameState
 
-instance Show RoomAction where
+instance Show (RoomAction IO) where
   show _ = "RoomAction"
 
 -- The ObjectId type represents the unique identifier for an object.
@@ -276,6 +277,7 @@ rooms =
           }
     }
 
+-- An object lookup is a map from object IDs to game objects.
 type ObjectLookup = Map.Map ObjectId GameObject
 
 -- The GameState is a record that holds the state of the game.
@@ -287,7 +289,9 @@ data GameState = GameState
     -- object lookup
     objects :: ObjectLookup,
     -- global flags
-    globalFlags :: Map.Map String Bool
+    globalFlags :: Map.Map String Bool,
+    -- messages displayed to the player
+    messages :: [String]
   }
   deriving (Show)
 
@@ -298,7 +302,8 @@ gameState =
     { zorkNumber = 1,
       here = ObjectId "West of House",
       objects = Map.fromList [(ObjectId "Rooms", rooms)],
-      globalFlags = Map.fromList [("WON-FLAG", False)]
+      globalFlags = Map.fromList [("WON-FLAG", False)],
+      messages = []
     }
 
 -- Set a global flag.
@@ -322,6 +327,17 @@ addObject gameState objectId object =
 -- attributes.
 withSetAttrs :: [Attribute] -> Attributes -> Attributes
 withSetAttrs rest attrs = foldl (flip setAttr) attrs rest
+
+-- Log a message.
+logMessage :: String -> GameState -> GameState
+logMessage message gameState =
+  gameState {messages = message : messages gameState}
+
+-- Tell the player a message.
+tell :: String -> GameState -> IO GameState
+tell message gameState = do
+  putStrLn message
+  return $ logMessage message gameState
 
 -- <ROOM WEST-OF-HOUSE
 --       (IN ROOMS)
@@ -368,6 +384,12 @@ westOfHouse =
                   (In, Conditional (GlobalFlag "WON-FLAG") (ObjectId "Stone Barrow") "You can't go that way.")
                 ],
             adjectives = ["white", "house", "board", "forest"],
-            location = ObjectId "Rooms"
+            location = ObjectId "Rooms",
+            action = Just westOfHouseAction
           }
     }
+
+-- The action associated with the "West of House" room.
+westOfHouseAction :: RoomArgument -> GameState -> IO GameState
+westOfHouseAction Look gameState = tell "You are standing in an open field west of a white house, with a boarded front door." gameState
+westOfHouseAction _ gameState = return gameState
